@@ -2,11 +2,7 @@
 #include <PubSubClient.h> // https://pubsubclient.knolleary.net/
 // #include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
 #include <Servo.h>
-
-const char* SSID = "***";
-const char* PASSWORD = "***";
-const char* MQTT_ENDPOINT = "192.168.x.x";
-const int MQTT_PORT = 1883;
+#include "env.h"
 
 Servo ESC;
 int speed = 0; //initial speed at 0
