@@ -1,20 +1,19 @@
 #include <ESP8266WiFi.h>
-#include <PubSubClient.h> // https://pubsubclient.knolleary.net/
-// #include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
-#include <Servo.h>
-#include "env.h"
-
-// ESP32 Guide: https://RandomNerdTutorials.com/esp32-mpu-6050-accelerometer-gyroscope-arduino/
-// ESP8266 Guide: https://RandomNerdTutorials.com/esp8266-nodemcu-mpu-6050-accelerometer-gyroscope-arduino/
-// Arduino Guide: https://RandomNerdTutorials.com/arduino-mpu-6050-accelerometer-gyroscope/
-
+#include <PubSubClient.h> //mqtt https://pubsubclient.knolleary.net/
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
+#include <Servo.h>
+#include "env.h"
 #include <Wire.h>
+// #include <ArduinoJson.h> // https://github.com/bblanchon/ArduinoJson
+
+const char* TOPIC_SPEED_LEFT = "speed_left";
+const char* TOPIC_SPEED_RIGHT = "speed_right";
 
 Adafruit_MPU6050 mpu;
-Servo motorA;
-Servo motorB;
+Servo motor_left;
+Servo motor_right;
+
 
 // the setup routine runs once when you press reset:
 void setup() {
@@ -31,10 +30,12 @@ void initMotors() {
   // declare pin 9 to be an output:
   pinMode(D5, OUTPUT);
   pinMode(D6, OUTPUT);
-  motorA.attach(D5,1000,2000);
-  motorB.attach(D6,1000,2000);
-  setSpeed(motorA, 0);// Initial speed must be 0
-  setSpeed(motorB, 0);
+
+  motor_left.attach(D5);
+  motor_right.attach(D6);
+  
+  setSpeed(motor_left, 0);// Initial speed must be 0
+  setSpeed(motor_right, 0);
 }
 
 void initMpu6050() {
@@ -112,28 +113,30 @@ void initMpu6050() {
   delay(100);
 }
 
-void callback(char* topic, byte* payload, unsigned int length) {
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
   String message = trimMsg(String((char*) payload), length);
   
   Serial.printf("Message arrived [%s] %s\n", topic, message);
-  
-  processMessage(message);
+
+  if (strcmp(topic, TOPIC_SPEED_LEFT)) {
+    uint speed = message.toInt();
+    setSpeed(motor_left, speed);
+  } else if (strcmp(topic, TOPIC_SPEED_RIGHT)) {
+    uint speed = message.toInt();
+    setSpeed(motor_right, speed);
+  } else {
+    Serial.println("Unknown topic, ignore message.");
+  }
 }
 
 WiFiClient wifiClient;
-PubSubClient client(MQTT_ENDPOINT, MQTT_PORT, callback, wifiClient); 
+PubSubClient client(MQTT_ENDPOINT, MQTT_PORT, mqttCallback, wifiClient); 
 
 String trimMsg(String msg, uint8_t len) {
   if (msg.length() > len) {
     return msg.substring(0, len);
   }
   return msg;
-}
-
-void processMessage(String message) {
-  uint8_t speed = message.toInt();
-  setSpeed(motorA, speed);
-  setSpeed(motorB, speed);
 }
 
 void initWifi() {
@@ -186,7 +189,8 @@ void connectMqtt() {
     Serial.println("connected");
 
     // subscribe
-    subscribe("speed");
+    subscribe(TOPIC_SPEED_LEFT);
+    subscribe(TOPIC_SPEED_RIGHT);
 
     // Once connected, get current status...
     // publish("$aws/things/aquarium/shadow/get", "");
